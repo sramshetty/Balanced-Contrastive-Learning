@@ -9,13 +9,16 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
     cls_num = 10
 
     def __init__(self, root, imb_type='exp', imb_factor=0.01, rand_number=0, train=True,
-                 transform=None,
+                 transform=None, target_transform=None,
                  download=False, bcl=False):
-        super(IMBALANCECIFAR10, self).__init__(root, train, transform, download, bcl)
+        super(IMBALANCECIFAR10, self).__init__(root, train, transform, target_transform, download)
         np.random.seed(rand_number)
         img_num_list = self.get_img_num_per_cls(self.cls_num, imb_type, imb_factor)
         self.gen_imbalanced_data(img_num_list)
         self.bcl = bcl
+
+        if bcl and train:
+            assert len(transform) < 3, "Please provide a list of 3 tranforms for bcl training"
 
     def get_img_num_per_cls(self, cls_num, imb_type, imb_factor):
         img_max = len(self.data) / cls_num
@@ -59,7 +62,7 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
     
     def __getitem__(self, index):
         sample = self.data[index]
-        label = self.targets[label]
+        label = self.targets[index]
         if self.transform is not None:
             if self.train and self.bcl:
                 sample1 = self.transform[0](sample)
