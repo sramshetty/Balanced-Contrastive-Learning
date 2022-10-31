@@ -18,7 +18,7 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
         self.bcl = bcl
 
         if bcl and train:
-            assert len(transform) < 3, "Please provide a list of 3 tranforms for bcl training"
+            assert len(transform) >= 3, "Please provide a list of 3 tranforms for bcl training"
 
     def get_img_num_per_cls(self, cls_num, imb_type, imb_factor):
         img_max = len(self.data) / cls_num
