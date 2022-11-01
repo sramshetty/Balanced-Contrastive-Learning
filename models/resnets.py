@@ -254,6 +254,16 @@ def _resnet(
     return model
 
 
+def resnet32(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
+    r"""ResNet-50 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _resnet('resnet32', BasicBlock, [5, 5, 5, 0],
+                   **kwargs)
+
 def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
@@ -278,6 +288,7 @@ def resnext50(pretrained: bool = False, progress: bool = True, **kwargs: Any) ->
 
 
 model_dict = {
+    'resnet32': [resnet32, 512],
     'resnet50': [resnet50, 2048],
     'resnext50': [resnext50, 2048]
 }
