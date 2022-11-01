@@ -2,6 +2,7 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
+from PIL import Image
 import numpy as np
 
 
@@ -15,6 +16,7 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
         np.random.seed(rand_number)
         img_num_list = self.get_img_num_per_cls(self.cls_num, imb_type, imb_factor)
         self.gen_imbalanced_data(img_num_list)
+        self.transform = transform
         self.bcl = bcl
 
         if bcl and train:
@@ -61,7 +63,7 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
         return cls_num_list
     
     def __getitem__(self, index):
-        sample = self.data[index]
+        sample = Image.fromarray(self.data[index], mode="RGB")
         label = self.targets[index]
         if self.transform is not None:
             if self.train and self.bcl:
