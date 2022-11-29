@@ -23,7 +23,7 @@ import numpy as np
 class FocalLoss(nn.Module):
     
     def __init__(self, cls_num_list, weight=None, gamma=2., reduction=None):
-        super(FocalLoss, self).__init__()
+        super(LogitAdjust, self).__init__()
         cls_num_list = torch.cuda.FloatTensor(cls_num_list)
         cls_p_list = cls_num_list / cls_num_list.sum()
         m_list = torch.log(cls_p_list)
