@@ -4,6 +4,8 @@ import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 import numpy as np
+import random
+from collections import Counter
 
 
 class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
@@ -11,14 +13,20 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
 
     def __init__(self, root, imb_type='exp', imb_factor=0.01, rand_number=0, train=True,
                  transform=None, target_transform=None,
-                 download=False, bcl=False):
+                 download=False, bcl=False, mixup=0):
         super(IMBALANCECIFAR10, self).__init__(root, train, transform, target_transform, download)
         np.random.seed(rand_number)
         img_num_list = self.get_img_num_per_cls(self.cls_num, imb_type, imb_factor)
         self.gen_imbalanced_data(img_num_list)
         self.transform = transform
         self.bcl = bcl
+        self.mixup = mixup
+        self.num_samples = len(self.data)
 
+        # set of most imbalanced classes (Classes with reasonably less samples than expected for uniform distribution)
+        self.least_freq_cls = set([c for c, count in Counter(self.targets).most_common() if (count + (self.num_samples//(len(img_num_list)*1.5))) < (self.num_samples//len(img_num_list))])
+        self.least_freq_indices = self.get_low_freq_idx(self.least_freq_cls)
+        
         if bcl and train:
             assert len(transform) >= 3, "Please provide a list of 3 tranforms for bcl training"
 
@@ -61,16 +69,41 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
         for i in range(self.cls_num):
             cls_num_list.append(self.num_per_cls_dict[i])
         return cls_num_list
+
+    def get_low_freq_idx(self, classes):
+        low_freq = []
+        for i, t in enumerate(self.targets):
+            if t in classes:
+                low_freq.append(i)
+        return low_freq
     
     def __getitem__(self, index):
         sample = Image.fromarray(self.data[index], mode="RGB")
         label = self.targets[index]
         if self.transform is not None:
             if self.train and self.bcl:
+                # Simplfy transforms for speedup
                 sample1 = self.transform[0](sample)
+                # sample2 = torch.clone(sample1)
+                # sample3 = torch.clone(sample1)
                 sample2 = self.transform[1](sample)
                 sample3 = self.transform[2](sample)
-                return [sample1, sample2, sample3], label
+
+                mixup_label = label #torch.nn.functional.one_hot(torch.tensor([label]), self.cls_num)
+                
+                # Referencing https://gist.github.com/ttchengab/49bfe3af8ab76561f1db107adc953b53#file-mixupdata-py
+                if self.mixup > 0 and random.random() < 0.3:
+                    rand_idx = random.randint(0, len(self.least_freq_indices)-1)
+                    rand_sample = self.transform[0](Image.fromarray(self.data[self.least_freq_indices[rand_idx]], mode="RGB"))
+                    rand_target = torch.nn.functional.one_hot(torch.tensor([self.targets[rand_idx]]), self.cls_num)
+
+                    lam = np.random.beta(self.mixup, self.mixup)
+                    sample1 = lam * sample1 + (1 - lam) * rand_sample
+                    # sample2 = lam * sample2 + (1 - lam) * rand_sample
+                    # sample3 = lam * sample3 + (1 - lam) * rand_sample
+                    mixup_label = lam * mixup_label + (1 - lam) * rand_target
+
+                return [sample1, sample2, sample3], label, mixup_label
             else:
                 return self.transform(sample), label
 
