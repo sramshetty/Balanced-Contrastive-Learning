@@ -62,3 +62,6 @@ python main.py --data /ImageDatasets/inat2018 \
   --wd 1e-4 --cos True \
   --cl_views sim-sim
 ```
+
+### CIFAR10
+CUDA_VISIBLE_DEVICES=0,1 python main_anthony.py --dataset "cifar10"  --arch "resnet50" --lr 0.1  --num_classes 10
