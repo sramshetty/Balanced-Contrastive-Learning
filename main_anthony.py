@@ -19,12 +19,13 @@ from dataset.cifar import IMBALANCECIFAR10, IMBALANCECIFAR100
 from utils import GaussianBlur, shot_acc
 import argparse
 import os
+from sklearn.metrics import confusion_matrix, accuracy_score, plot_confusion_matrix
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='cifar10', choices=['cifar10', 'cifar100'])
 parser.add_argument('--data', default='./cifar', metavar='DIR')
 parser.add_argument('--num_classes', default=10, type=int)
-parser.add_argument('--arch', default='resnet50', choices=['resnet50', 'resnext50'])
+parser.add_argument('--arch', default='resnet50')
 parser.add_argument('--workers', default=12, type=int)
 parser.add_argument('--epochs', default=90, type=int)
 parser.add_argument('--temp', default=0.07, type=float, help='scalar temperature for contrastive learning')
@@ -143,9 +144,14 @@ def main_worker(gpu, ngpus_per_node, args):
 #     normalize = transforms.Normalize((0.466, 0.471, 0.380), (0.195, 0.194, 0.192)) if args.dataset == 'inat' \
 #         else transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
-    normalize = transforms.Normalize((0.49139968, 0.48215827 ,0.44653124), (0.24703233, 0.24348505, 0.26158768))
-    rgb_mean = (0.49139968, 0.48215827 ,0.44653124)  # mean for cifar10
-    ra_params = dict(translate_const=int(32 * 0.45), img_mean=tuple([min(255, round(255 * x)) for x in rgb_mean]), )
+    if args.dataset == "cifar10":
+        normalize = transforms.Normalize((0.49139968, 0.48215827 ,0.44653124), (0.24703233, 0.24348505, 0.26158768))
+        rgb_mean = (0.49139968, 0.48215827 ,0.44653124)  # mean for cifar10
+        ra_params = dict(translate_const=int(32 * 0.45), img_mean=tuple([min(255, round(255 * x)) for x in rgb_mean]), )
+    elif args.dataset == "cifar100":
+        normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+        rgb_mean = (0.5071, 0.4867, 0.4408)  # mean for cifar10
+        ra_params = dict(translate_const=int(32 * 0.45), img_mean=tuple([min(255, round(255 * x)) for x in rgb_mean]), )
     augmentation_randncls = [
         transforms.RandomResizedCrop(32, scale=(0.08, 1.)),
         transforms.RandomHorizontalFlip(),
@@ -223,10 +229,16 @@ def main_worker(gpu, ngpus_per_node, args):
         transforms.ToTensor(),
     ])
 
-    dataset_train = IMBALANCECIFAR10(root=args.data, train=True,
-        download=True, transform=cifar_train_aug, bcl=True)
-    dataset_test  = IMBALANCECIFAR10(root=args.data, train=False,
-        download=True, transform=cifar_test_aug, bcl=True)
+    if args.dataset == "cifar10":
+        dataset_train = IMBALANCECIFAR10(root=args.data, train=True,
+            download=True, transform=cifar_train_aug, bcl=True)
+        dataset_test = IMBALANCECIFAR10(root=args.data, train=False,
+            download=True, transform=cifar_test_aug, bcl=True)
+    elif args.dataset == "cifar100":
+        dataset_train = IMBALANCECIFAR100(root=args.data, train=True,
+            download=True, transform=cifar_train_aug, bcl=True)
+        dataset_test = IMBALANCECIFAR100(root=args.data, train=False,
+            download=True, transform=cifar_test_aug, bcl=True)
 
     cls_num_list = dataset_train.get_cls_num_list()
     args.cls_num = len(cls_num_list)
@@ -276,7 +288,10 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion_ce, criterion_scl, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1 = validate(train_loader, val_loader, model, criterion_ce, epoch, args)
+        if args.dataset == "cifar10":
+            acc1 = validate(train_loader, val_loader, model, criterion_ce, epoch, args, cls_num_list=cls_num_list)
+        elif args.dataset == "cifar100":
+            acc1, cm_classes = validate(train_loader, val_loader, model, criterion_ce, epoch, args, cls_num_list=cls_num_list)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -294,7 +309,39 @@ def main_worker(gpu, ngpus_per_node, args):
         #     'best_acc1': best_acc1,
         #     'optimizer': optimizer.state_dict(),
         # }, is_best)
+        
 
+# def plot_cm_classes():
+
+def compute_class_acc(cls_num_list, target, pred):
+    many_classes = [i for i, num_cls in enumerate(cls_num_list) if num_cls > 100]
+    medium_classes = [i for i, num_cls in enumerate(cls_num_list) if 20 <= num_cls <= 100]
+    few_classes = [i for i, num_cls in enumerate(cls_num_list) if num_cls < 20]
+    target_classes=[]
+    pred_classes=[]
+
+    for i in target:
+        if i in many_classes:
+            target_classes.append('1_many')
+        elif i in medium_classes:
+            target_classes.append('2_medium')
+        else:
+            target_classes.append('3_few')
+
+    for i in pred:
+        if i in many_classes:
+            pred_classes.append('1_many')
+        elif i in medium_classes:
+            pred_classes.append('2_medium')
+        else:
+            pred_classes.append('3_few')
+
+    overall_acc=accuracy_score(target_classes, pred_classes)
+    cm_classes=confusion_matrix(target_classes, pred_classes, normalize='true')
+    print("Overall Accuracy {:0.4f} ".format(overall_acc) )
+    print('Many/Medium/Few Accuracy:', cm_classes.diagonal())
+
+    return cm_classes
 
 def train(train_loader, model, criterion_ce, criterion_scl, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
@@ -346,7 +393,7 @@ def train(train_loader, model, criterion_ce, criterion_scl, optimizer, epoch, ar
     print('acc/train_top1', top1.avg, epoch)
 
 
-def validate(train_loader, val_loader, model, criterion_ce, epoch, args, flag='val'):
+def validate(train_loader, val_loader, model, criterion_ce, epoch, args, flag='val', cls_num_list=None):
     model.eval()
     batch_time = AverageMeter('Time', ':6.3f')
     ce_loss_all = AverageMeter('CE_Loss', ':.4e')
@@ -382,6 +429,13 @@ def validate(train_loader, val_loader, model, criterion_ce, epoch, args, flag='v
 
         print('CE loss/val', ce_loss_all.avg, epoch)
         print('acc/val_top1', top1.avg, epoch)
+
+        if args.dataset == "cifar100":
+            _, pred = total_logits.topk(1, 1, True, True)
+            pred = pred.t().squeeze()
+            # print(total_labels, total_logits, pred, pred.shape, total_labels.shape, total_logits.shape)
+            cm_classes = compute_class_acc(cls_num_list, total_labels, pred)
+            return top1.avg, cm_classes
 
         # probs, preds = F.softmax(total_logits.detach(), dim=1).max(dim=1)
         # many_acc_top1, median_acc_top1, low_acc_top1 = shot_acc(preds, total_labels, train_loader, acc_per_cls=False)
