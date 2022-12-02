@@ -13,7 +13,7 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
 
     def __init__(self, root, imb_type='exp', imb_factor=0.01, rand_number=0, train=True,
                  transform=None, target_transform=None,
-                 download=False, bcl=False, mixup=0):
+                 download=False, bcl=False, mixup=False):
         super(IMBALANCECIFAR10, self).__init__(root, train, transform, target_transform, download)
         np.random.seed(rand_number)
         img_num_list = self.get_img_num_per_cls(self.cls_num, imb_type, imb_factor)
@@ -29,9 +29,7 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
 
         # set of most imbalanced classes (Classes with reasonably less samples than expected for uniform distribution)
         self.least_freq_cls = set([c for c, count in Counter(self.targets).most_common() if (count + (self.num_samples//(len(img_num_list)*2))) < (self.num_samples//len(img_num_list))])
-        print(self.least_freq_cls)
         self.least_freq_indices = self.get_low_freq_idx(self.least_freq_cls)
-        print(self.least_freq_indices)
 
         self.inv_data_p = np.array(img_num_list[::-1]) / sum(img_num_list)
         self.cls_indices = self.get_indices_cls()
@@ -99,7 +97,7 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
             if self.train and self.bcl:
                 # Simplfy transforms for speedup
                 rand_n = random.random()
-                sample1 = self.transform[0](sample) if rand_n < 0.8 else self.mixup_transforms(sample)
+                sample1 = self.transform[0](sample) if rand_n >= 0.2 else self.mixup_transforms(sample)
                 # sample2 = torch.clone(sample1)
                 # sample3 = torch.clone(sample1)
                 sample2 = self.transform[1](sample)
@@ -108,20 +106,20 @@ class IMBALANCECIFAR10(torchvision.datasets.CIFAR10):
                 mixup_label = torch.nn.functional.one_hot(torch.tensor(label), self.cls_num)
                 
                 # Referencing https://gist.github.com/ttchengab/49bfe3af8ab76561f1db107adc953b53#file-mixupdata-py
-                if self.mixup > 0 and rand_n >= 0.8:
+                if self.mixup and rand_n < 0.2:
                     rand_p = random.random()
                     rand_cls = 0
-                    while rand_p < sum(self.inv_data_p[0:rand_cls+1]):
+                    while rand_p > sum(self.inv_data_p[0:rand_cls+1]):
                         rand_cls += 1
                     rand_idx = random.choice(self.cls_indices[rand_cls])
                     
                     rand_sample = self.mixup_transforms(Image.fromarray(self.data[rand_idx], mode="RGB"))
-                    rand_target = torch.nn.functional.one_hot(torch.tensor(self.least_freq_indices[rand_idx]), self.cls_num)
+                    rand_target = torch.nn.functional.one_hot(torch.tensor(self.targets[rand_idx]), self.cls_num)
 
                     # lam = np.random.beta(self.mixup, self.mixup)
-                    # lam = np.random.randint(0, 9)
-                    sample1 = (1-rand_n) * sample1 + (rand_n) * rand_sample
-                    mixup_label = (1-rand_n) * mixup_label + (rand_n) * rand_target
+                    lam = np.random.randint(1, 3) / 10
+                    sample1 = lam * sample1 + (1 - lam) * rand_sample
+                    mixup_label = lam * mixup_label + (1 - lam) * rand_target
 
                 return [sample1, sample2, sample3], label, mixup_label
             else:
