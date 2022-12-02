@@ -64,4 +64,6 @@ python main.py --data /ImageDatasets/inat2018 \
 ```
 
 ### CIFAR10
-CUDA_VISIBLE_DEVICES=0,1 python main_anthony.py --dataset "cifar10"  --arch "resnet50" --lr 0.1  --num_classes 10
+CUDA_VISIBLE_DEVICES=0,1 python main_anthony.py --dataset "cifar10"  --arch "resnet50" --lr 0.1 --epochs 100 --wd 5e-4 --cos True --num_classes 10
+
+CUDA_VISIBLE_DEVICES=0,1 python main_anthony.py --dataset "cifar100"  --arch "resnet50" --lr 0.1 --epochs 100 --wd 5e-4 --cos True --num_classes 100

@@ -23,7 +23,7 @@ class BalSCL(nn.Module):
         targets = targets.contiguous().view(-1, 1)
         targets_centers = torch.arange(len(self.cls_num_list), device=device).view(-1, 1)
         targets = torch.cat([targets.repeat(2, 1), targets_centers], dim=0)
-        batch_cls_count = torch.eye(len(self.cls_num_list))[targets].sum(dim=0).squeeze()
+        batch_cls_count = torch.eye(len(self.cls_num_list))[targets.cpu()].sum(dim=0).squeeze()
 
         mask = torch.eq(targets[:2 * batch_size], targets.T).float().to(device)
         logits_mask = torch.scatter(
@@ -46,7 +46,7 @@ class BalSCL(nn.Module):
 
         # class-averaging
         exp_logits = torch.exp(logits) * logits_mask
-        per_ins_weight = torch.tensor([batch_cls_count[i] for i in targets], device=device).view(1, -1).expand(
+        per_ins_weight = torch.tensor([batch_cls_count[i] for i in targets.cpu()], device=device).view(1, -1).expand(
             2 * batch_size, 2 * batch_size + len(self.cls_num_list)) - mask
         exp_logits_sum = exp_logits.div(per_ins_weight).sum(dim=1, keepdim=True)
         

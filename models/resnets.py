@@ -272,6 +272,10 @@ def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
     """
     return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], **kwargs)
 
+def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
+    """ResNet-101 from `Deep Residual Learning for Image Recognition <https://arxiv.org/pdf/1512.03385.pdf>`__.
+    """
+    return _resnet('resnet101', Bottleneck, [3, 4, 23, 3], **kwargs)
 
 def resnext50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
     r"""ResNeXt-50 32x4d model from
