@@ -254,15 +254,14 @@ def _resnet(
     return model
 
 
-def resnet32(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
-    r"""ResNet-32 model from
+def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
+    r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet('resnet32', BasicBlock, [5, 5, 5, 0],
-                   **kwargs)
+    return _resnet('resnet34', BasicBlock, [3, 4, 6, 3], **kwargs)
 
 def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
     r"""ResNet-50 model from
@@ -271,8 +270,7 @@ def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3],
-                   **kwargs)
+    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], **kwargs)
 
 
 def resnext50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
@@ -288,7 +286,7 @@ def resnext50(pretrained: bool = False, progress: bool = True, **kwargs: Any) ->
 
 
 model_dict = {
-    'resnet32': [resnet32, 512],
+    'resnet34': [resnet34, 512],
     'resnet50': [resnet50, 2048],
     'resnext50': [resnext50, 2048]
 }
