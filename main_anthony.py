@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from loss.contrastive import BalSCL
 from loss.logitadjust import LogitAdjust
+from loss.focal import FocalLoss
 import math
 from dataset.inat import INaturalist
 from dataset.imagenet import ImageNetLT
@@ -19,6 +20,7 @@ from dataset.cifar import IMBALANCECIFAR10, IMBALANCECIFAR100
 from utils import GaussianBlur, shot_acc
 import argparse
 import os
+import numpy as np
 from sklearn.metrics import confusion_matrix, accuracy_score, plot_confusion_matrix
 
 parser = argparse.ArgumentParser()
@@ -70,6 +72,7 @@ parser.add_argument('--randaug_m', default=10, type=int, help='randaug-m')
 parser.add_argument('--randaug_n', default=2, type=int, help='randaug-n')
 parser.add_argument('--seed', default=None, type=int, help='seed for initializing training')
 parser.add_argument('--reload', default=False, type=bool, help='load supervised model')
+parser.add_argument('--loss', default='CE', type=str)
 
 
 def main():
@@ -251,7 +254,15 @@ def main_worker(gpu, ngpus_per_node, args):
         dataset_test, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
-    criterion_ce = LogitAdjust(cls_num_list).cuda(args.gpu)
+    if args.loss == "CE":
+        criterion_ce = LogitAdjust(cls_num_list).cuda(args.gpu)
+    elif args.loss == "FL":
+        criterion_ce = FocalLoss().cuda(args.gpu)
+    elif args.loss == "WCE":
+        total_cls = np.sum(cls_num_list)
+        # cls_num_list_float = [float(x) for x in cls_num_list]
+        criterion_ce_weight = torch.from_numpy(np.array([total_cls / x for x in cls_num_list])).float()
+        criterion_ce = LogitAdjust(cls_num_list, weight=criterion_ce_weight.cuda()).cuda(args.gpu)
     criterion_scl = BalSCL(cls_num_list, args.temp).cuda(args.gpu)
 
 #     tf_writer = SummaryWriter(log_dir=os.path.join(args.root_log, args.store_name))
