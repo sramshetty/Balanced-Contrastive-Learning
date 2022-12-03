@@ -34,7 +34,7 @@ class FocalLoss(nn.Module):
         
     def forward(self, x, target):
         # log_prob = F.log_softmax(x, dim=-1)
-        log_prob=self.m_list
+        log_prob= x + self.m_list
         prob = torch.exp(log_prob)
         return F.nll_loss(
             ((1 - prob) ** self.gamma) * log_prob, 
