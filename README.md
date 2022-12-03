@@ -5,7 +5,7 @@ This is a Pytorch implementation of the [BCL paper](https://openaccess.thecvf.co
 <img src="https://github.com/FlamieZhu/BCL/blob/main/img/bcl.png" width="800">
 </p>
 
-If you find this code useful, please cite our paper:
+If you find this code useful, please consider citing our paper:
 ```
 @inproceedings{zhu2022balanced,
   title={Balanced Contrastive Learning for Long-Tailed Visual Recognition},
@@ -35,7 +35,7 @@ We provide three options for data augmentations of contrastive leanring branch: 
 ## Usage
 For ImageNet-LT and iNaturalist 2018 training and evaluation. All experiments are conducted on 4 GPUs.
 ### ImageNet-LT 
-To do supervised training with BCL for 90 epochs on ImageNet-LT, run
+To do supervised training with BCL for 90 epochs on ImageNet-LT with 4 gpus, run
 ```
 python main.py --data /ImageDatasets/imagenet_2012 \
   --lr 0.1 -p 200 --epochs 90 \
@@ -54,7 +54,7 @@ python main.py --data /ImageDatasets/imagenet_2012 \
   --resume log/imagenet_resnet50_batchsize256_epochs_90_temp_0.07_lr_0.1_sim-sim/bcl_ckpt.best.pth.tar
 ```
 ### iNaturalist 2018 
-To do supervised training with BCL for 100 epochs on iNaturalist 2018, run
+To do supervised training with BCL for 100 epochs on iNaturalist 2018 with 4 gpus, run
 ```
 python main.py --data /ImageDatasets/inat2018 \
   --lr 0.2 -p 200 --epochs 100 \
