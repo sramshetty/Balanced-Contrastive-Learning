@@ -22,6 +22,7 @@ import argparse
 import os
 import numpy as np
 from sklearn.metrics import confusion_matrix, accuracy_score, plot_confusion_matrix
+from custom_augments.cutout import Cutout
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='cifar10', choices=['cifar10', 'cifar100'])
@@ -163,6 +164,9 @@ def main_worker(gpu, ngpus_per_node, args):
         ], p=1.0),
         rand_augment_transform('rand-n{}-m{}-mstd0.5'.format(args.randaug_n, args.randaug_m), ra_params),
         transforms.ToTensor(),
+        transforms.RandomApply([
+            Cutout(3, 3),
+        ], p=0.5),
         normalize,
     ]
     augmentation_randnclsstack = [
@@ -328,31 +332,52 @@ def compute_class_acc(cls_num_list, target, pred):
     many_classes = [i for i, num_cls in enumerate(cls_num_list) if num_cls > 100]
     medium_classes = [i for i, num_cls in enumerate(cls_num_list) if 20 <= num_cls <= 100]
     few_classes = [i for i, num_cls in enumerate(cls_num_list) if num_cls < 20]
-    target_classes=[]
-    pred_classes=[]
+    # target_classes=[]
+    # pred_classes=[]
 
-    for i in target:
-        if i in many_classes:
-            target_classes.append('1_many')
-        elif i in medium_classes:
-            target_classes.append('2_medium')
-        else:
-            target_classes.append('3_few')
+    # for i in target:
+    #     if i in many_classes:
+    #         target_classes.append('1_many')
+    #     elif i in medium_classes:
+    #         target_classes.append('2_medium')
+    #     else:
+    #         target_classes.append('3_few')
 
-    for i in pred:
-        if i in many_classes:
-            pred_classes.append('1_many')
-        elif i in medium_classes:
-            pred_classes.append('2_medium')
-        else:
-            pred_classes.append('3_few')
+    # for i in pred:
+    #     if i in many_classes:
+    #         pred_classes.append('1_many')
+    #     elif i in medium_classes:
+    #         pred_classes.append('2_medium')
+    #     else:
+    #         pred_classes.append('3_few')
 
-    overall_acc=accuracy_score(target_classes, pred_classes)
-    cm_classes=confusion_matrix(target_classes, pred_classes, normalize='true')
-    print("Overall Accuracy {:0.4f} ".format(overall_acc) )
-    print('Many/Medium/Few Accuracy:', cm_classes.diagonal())
+    target, pred = target.cpu(), pred.cpu()
+    overall_acc=accuracy_score(target.cpu(), pred.cpu())
+    many_target = []
+    many_pred = []
+    med_target = []
+    med_pred = []
+    few_target = []
+    few_pred = []
+    for i, j in enumerate(target):
+        if j in many_classes:
+            many_target.append(j)
+            many_pred.append(pred[i])
+        elif j in medium_classes:
+            med_target.append(j)
+            med_pred.append(pred[i])
+        elif j in few_classes:
+            few_target.append(j)
+            few_pred.append(pred[i])
+    print(f"Overall Accuracy: {overall_acc * 100}")
+    print(f"Many Accuracy: {accuracy_score(many_target, many_pred) * 100}")
+    print(f"Medium Accuracy: {accuracy_score(med_target, med_pred) * 100}")
+    print(f"Few Accuracy: {accuracy_score(few_target, few_pred) * 100}")
 
-    return cm_classes
+    # cm_classes=confusion_matrix(target_classes, pred_classes, normalize='true')
+    # print('Many/Medium/Few Accuracy:', cm_classes.diagonal())
+
+    # return cm_classes
 
 def train(train_loader, model, criterion_ce, criterion_scl, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
@@ -445,8 +470,8 @@ def validate(train_loader, val_loader, model, criterion_ce, epoch, args, flag='v
             _, pred = total_logits.topk(1, 1, True, True)
             pred = pred.t().squeeze()
             # print(total_labels, total_logits, pred, pred.shape, total_labels.shape, total_logits.shape)
-            cm_classes = compute_class_acc(cls_num_list, total_labels, pred)
-            return top1.avg, cm_classes
+            compute_class_acc(cls_num_list, total_labels, pred)
+            return top1.avg, None
 
         # probs, preds = F.softmax(total_logits.detach(), dim=1).max(dim=1)
         # many_acc_top1, median_acc_top1, low_acc_top1 = shot_acc(preds, total_labels, train_loader, acc_per_cls=False)
