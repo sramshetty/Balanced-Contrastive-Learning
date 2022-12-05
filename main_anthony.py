@@ -23,6 +23,9 @@ import os
 import numpy as np
 from sklearn.metrics import confusion_matrix, accuracy_score, plot_confusion_matrix
 from custom_augments.cutout import Cutout
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sn
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='cifar10', choices=['cifar10', 'cifar100'])
@@ -307,6 +310,7 @@ def main_worker(gpu, ngpus_per_node, args):
             acc1 = validate(train_loader, val_loader, model, criterion_ce, epoch, args, cls_num_list=cls_num_list)
         elif args.dataset == "cifar100":
             acc1, cm_classes = validate(train_loader, val_loader, model, criterion_ce, epoch, args, cls_num_list=cls_num_list)
+            plot_cm_classes(cm_classes)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -324,32 +328,41 @@ def main_worker(gpu, ngpus_per_node, args):
         #     'best_acc1': best_acc1,
         #     'optimizer': optimizer.state_dict(),
         # }, is_best)
-        
 
-# def plot_cm_classes():
+def plot_cm_classes(cm_classes):
+    cm_clsses_df = pd.DataFrame(cm_classes, index =['Many','Medium','Few'], columns=['Many','Medium','Few'])
+    plt.figure(figsize = (8,6))
+    ax = sn.heatmap(cm_clsses_df, annot=True, cmap="Blues", vmin=0, vmax=1)
+    sn.set(font_scale=2)
+    ax.xaxis.tick_top()
+    ax.xaxis.set_label_position('top') 
+    ax.set(xlabel="Predicted Class", ylabel="True Class")
+    plt.xlabel("Predicted Class", fontsize = 22) 
+    plt.ylabel("True Class", fontsize = 22)
+    plt.savefig("resnet34-BCL.png", dpi=300)
 
 def compute_class_acc(cls_num_list, target, pred):
     many_classes = [i for i, num_cls in enumerate(cls_num_list) if num_cls > 100]
     medium_classes = [i for i, num_cls in enumerate(cls_num_list) if 20 <= num_cls <= 100]
     few_classes = [i for i, num_cls in enumerate(cls_num_list) if num_cls < 20]
-    # target_classes=[]
-    # pred_classes=[]
+    target_classes=[]
+    pred_classes=[]
 
-    # for i in target:
-    #     if i in many_classes:
-    #         target_classes.append('1_many')
-    #     elif i in medium_classes:
-    #         target_classes.append('2_medium')
-    #     else:
-    #         target_classes.append('3_few')
+    for i in target:
+        if i in many_classes:
+            target_classes.append('1_many')
+        elif i in medium_classes:
+            target_classes.append('2_medium')
+        else:
+            target_classes.append('3_few')
 
-    # for i in pred:
-    #     if i in many_classes:
-    #         pred_classes.append('1_many')
-    #     elif i in medium_classes:
-    #         pred_classes.append('2_medium')
-    #     else:
-    #         pred_classes.append('3_few')
+    for i in pred:
+        if i in many_classes:
+            pred_classes.append('1_many')
+        elif i in medium_classes:
+            pred_classes.append('2_medium')
+        else:
+            pred_classes.append('3_few')
 
     target, pred = target.cpu(), pred.cpu()
     overall_acc=accuracy_score(target.cpu(), pred.cpu())
@@ -374,10 +387,9 @@ def compute_class_acc(cls_num_list, target, pred):
     print(f"Medium Accuracy: {accuracy_score(med_target, med_pred) * 100}")
     print(f"Few Accuracy: {accuracy_score(few_target, few_pred) * 100}")
 
-    # cm_classes=confusion_matrix(target_classes, pred_classes, normalize='true')
-    # print('Many/Medium/Few Accuracy:', cm_classes.diagonal())
+    cm_classes=confusion_matrix(target_classes, pred_classes, normalize='true')
 
-    # return cm_classes
+    return cm_classes
 
 def train(train_loader, model, criterion_ce, criterion_scl, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
@@ -470,8 +482,8 @@ def validate(train_loader, val_loader, model, criterion_ce, epoch, args, flag='v
             _, pred = total_logits.topk(1, 1, True, True)
             pred = pred.t().squeeze()
             # print(total_labels, total_logits, pred, pred.shape, total_labels.shape, total_logits.shape)
-            compute_class_acc(cls_num_list, total_labels, pred)
-            return top1.avg, None
+            cm_classes = compute_class_acc(cls_num_list, total_labels, pred)
+            return top1.avg, cm_classes
 
         # probs, preds = F.softmax(total_logits.detach(), dim=1).max(dim=1)
         # many_acc_top1, median_acc_top1, low_acc_top1 = shot_acc(preds, total_labels, train_loader, acc_per_cls=False)
